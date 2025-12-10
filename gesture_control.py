@@ -20,12 +20,17 @@ class GestureController:
         
         # gesture state
         self.prev_gesture = None
+        
+        # 模式控制：True=长按模式，False=单次按键模式
+        self.hold_mode = True
+        
+        # 记录当前按下的键
+        self.current_pressed_keys = set()
     
     ##################################################
     #############     手指數量     ###################
     ##################################################
     def count_fingers(self, hand_landmarks):
-        
         fingers = []
         
         # 拇指 (根据 x 坐标判断)
@@ -74,35 +79,65 @@ class GestureController:
     
     def execute_keyboard_action(self, gesture):
         """根据手势执行键盘操作"""
-        if gesture == self.prev_gesture:
-            return  # 避免重复触发
-            
-        self.prev_gesture = gesture
-        
-        # 定义手势到键盘操作的映射
-        actions = {
-            "one": lambda: pyautogui.press('w'),      # 向上
-            "two": lambda: pyautogui.press('s'),    # 向下
-            "three": lambda: pyautogui.press('a'),  # 向左
-            "four": lambda: pyautogui.press('d'),  # 向右
-            "five": lambda: pyautogui.press('space'),  # 空格
-            "fist": lambda: pyautogui.press('enter'),  # 回车
+        # 定义手势到按键的映射
+        key_mapping = {
+            "one": 'w',
+            "two": 's',
+            "three": 'a',
+            "four": 'd',
+            "five": 'space',
+            "fist": 'enter',
         }
         
-        if gesture in actions:
-            actions[gesture]()
-            print(f"操作: {gesture}")
+        if self.hold_mode:
+            # 长按模式
+            if gesture in key_mapping:
+                key = key_mapping[gesture]
+                # 如果这个键还没被按下，则按下它
+                if key not in self.current_pressed_keys:
+                    pyautogui.keyDown(key)
+                    self.current_pressed_keys.add(key)
+                    print(f"按下: {gesture} ({key})")
+                
+                # 释放所有不是当前手势的键
+                for pressed_key in list(self.current_pressed_keys):
+                    if pressed_key != key:
+                        pyautogui.keyUp(pressed_key)
+                        self.current_pressed_keys.remove(pressed_key)
+                        print(f"释放: {pressed_key}")
+            else:
+                # 没有识别到手势时，释放所有按键
+                for pressed_key in list(self.current_pressed_keys):
+                    pyautogui.keyUp(pressed_key)
+                    self.current_pressed_keys.remove(pressed_key)
+                    print(f"释放: {pressed_key}")
+        else:
+            # 单次按键模式
+            if gesture == self.prev_gesture:
+                return  # 避免重复触发
+                
+            self.prev_gesture = gesture
+            
+            if gesture in key_mapping:
+                pyautogui.press(key_mapping[gesture])
+                print(f"操作: {gesture}")
     
     def run(self):
         ### MAIN ###
         print("手势控制已启动！")
-        print("  1根手指 -> 上箭头")
-        print("  2根手指 -> 下箭头")
-        print("  3根手指 -> 左箭头")
-        print("  4根手指 -> 右箭头")
+        print("=" * 50)
+        print("手势映射：")
+        print("  1根手指 -> W 键")
+        print("  2根手指 -> S 键")
+        print("  3根手指 -> A 键")
+        print("  4根手指 -> D 键")
         print("  5根手指(手掌) -> 空格键")
         print("  拳头 -> 回车键")
-        print("按 'q' 退出")
+        print("=" * 50)
+        print(f"当前模式: {'长按模式 (适合游戏)' if self.hold_mode else '单次按键模式'}")
+        print("按 'M' 切换模式")
+        print("按 'Q' 退出")
+        print("=" * 50)
         
         while True:
             ret, frame = self.cap.read()
@@ -144,16 +179,48 @@ class GestureController:
                     # 执行键盘操作
                     self.execute_keyboard_action(gesture)
             else:
+                # 没有检测到手时
                 self.prev_gesture = None
+                # 长按模式下释放所有按键
+                if self.hold_mode:
+                    for pressed_key in list(self.current_pressed_keys):
+                        pyautogui.keyUp(pressed_key)
+                        self.current_pressed_keys.remove(pressed_key)
+            
+            # 显示当前模式
+            mode_text = "Mode: HOLD" if self.hold_mode else "Mode: PRESS"
+            cv2.putText(
+                frame,
+                mode_text,
+                (10, frame.shape[0] - 20),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (255, 255, 0),
+                2
+            )
             
             # 显示画面
             cv2.imshow('Gesture Control', frame)
             
-            # 按 'q' 退出
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            # 按键控制
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q') or key == ord('Q'):
                 break
+            elif key == ord('m') or key == ord('M'):
+                self.hold_mode = not self.hold_mode
+                # 切换模式时释放所有按键
+                for pressed_key in list(self.current_pressed_keys):
+                    pyautogui.keyUp(pressed_key)
+                self.current_pressed_keys.clear()
+                mode_name = "长按模式 (适合游戏)" if self.hold_mode else "单次按键模式"
+                print(f"\n已切换至: {mode_name}\n")
         
         # 清理资源
+        # 释放所有可能还按着的键
+        for pressed_key in list(self.current_pressed_keys):
+            pyautogui.keyUp(pressed_key)
+        self.current_pressed_keys.clear()
+        
         self.cap.release()
         cv2.destroyAllWindows()
 

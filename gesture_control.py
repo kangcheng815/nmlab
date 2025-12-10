@@ -81,22 +81,21 @@ class GestureController:
         
         # 定义手势到键盘操作的映射
         actions = {
-            "one": lambda: pyautogui.press('up'),      # 向上
-            "two": lambda: pyautogui.press('down'),    # 向下
-            "three": lambda: pyautogui.press('left'),  # 向左
-            "four": lambda: pyautogui.press('right'),  # 向右
+            "one": lambda: pyautogui.press('w'),      # 向上
+            "two": lambda: pyautogui.press('s'),    # 向下
+            "three": lambda: pyautogui.press('a'),  # 向左
+            "four": lambda: pyautogui.press('d'),  # 向右
             "five": lambda: pyautogui.press('space'),  # 空格
             "fist": lambda: pyautogui.press('enter'),  # 回车
         }
         
         if gesture in actions:
             actions[gesture]()
-            print(f"执行操作: {gesture}")
+            print(f"操作: {gesture}")
     
     def run(self):
-        """主循环"""
+        ### MAIN ###
         print("手势控制已启动！")
-        print("手势映射：")
         print("  1根手指 -> 上箭头")
         print("  2根手指 -> 下箭头")
         print("  3根手指 -> 左箭头")
